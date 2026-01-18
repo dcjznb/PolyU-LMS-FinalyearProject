@@ -1,2 +1,11 @@
 networkx
 matplotlib
+numpy
+pandas
+matplotlib
+scikit-learn
+jupyter
+requests
+flask
+pillow
+opencv-python
