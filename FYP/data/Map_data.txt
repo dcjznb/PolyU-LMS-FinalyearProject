@@ -1,9 +1,0 @@
-Physically, consumer drones can carry 0.2 kg to 2 kg (0.4–5.5 lbs), while heavy-lift models like the CW-80E handle up to 25 kg (55 lbs). Industrial giants like the Griff 300 lift over 500 kg (1,100 lbs).
-Legally, the FAA limits commercial drones to 25 kg (55 lbs) under Part 107 rules. In the EU, drones over 250g require certifications, with fines or crashes likely if exceeded.
-
-1. Base
-Tai Po Market Station: 22.444671405266394, 114.17050140348809
-
-2. Customer
-Rich people in mountains: 22.43792976337074, 114.1825851176402
-Industry area: 22.457402713598, 114.18764805646266
