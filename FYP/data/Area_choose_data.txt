@@ -2,18 +2,22 @@
 Topographical Features:
 Population: 2,137/km²
 MTR Distance: 1.975km
+Peak Hour Delay Index:1.27
 
 2. Hung Hom
 Topographical Features:
 Population: 100，779.9239/km²
 MTR Distance: 0.6025km
+Peak Hour Delay Index:1
 
 3. Sai Kung Town
 Topographical Features:
 Population: 11,115/km²
-MTR Distance:
+MTR Distance:5.62km
+Peak Hour Delay Index:1.33
 
 4. West Mid-Levels
 Topographical Features:
 Population: 18,967/km²
-MTR Distance:
+MTR Distance:4.20km
+Peak Hour Delay Index:1.82
