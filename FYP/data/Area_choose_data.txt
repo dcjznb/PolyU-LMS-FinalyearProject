@@ -1,19 +1,19 @@
 1. Tai Po Market (Typical New Town)
 Topographical Features:
 Population: 2,137/km²
-MTR Distance:
+MTR Distance: 1.975km
 
 2. Hung Hom
 Topographical Features:
-Population: 41,055/km²
-MTR Distance:
+Population: 100，779.9239/km²
+MTR Distance: 0.6025km
 
 3. Sai Kung Town
 Topographical Features:
 Population: 11,115/km²
 MTR Distance:
 
-4. Mid-Levels
+4. West Mid-Levels
 Topographical Features:
 Population: 18,967/km²
 MTR Distance:
