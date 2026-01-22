@@ -44,172 +44,132 @@ df_preview = pd.DataFrame(raw_data)
 print(df_preview)
 
 # ==========================================
-# PHASE 2: SCORING LOGIC (WEIGHTED FOR PROFITABILITY)
+# PHASE 2: MULTI-SCENARIO SCORING ENGINE
 # ==========================================
 
 
-def calculate_scores(data_dict):
-    # Create DataFrame
+def calculate_scenarios(data_dict):
     df = pd.DataFrame(data_dict)
-    scores = pd.DataFrame()
-    scores["Area"] = df["Area"]
 
-    # ---------------------------------------------------------
-    # 1. Commercial Demand Score (30% Weight)
-    # ---------------------------------------------------------
-    # Logic: Higher Density = High Volume = Lower Fixed Cost per Order.
+    # -----------------------------------------------------
+    # 1. Calculate Basic Component Scores (0-10)
+    # -----------------------------------------------------
+
+    # Demand (Based on Density)
     d = df["Population_Density"]
-    scores["Demand_Score"] = (d - d.min()) / (d.max() - d.min()) * 10
+    demand = (d - d.min()) / (d.max() - d.min()) * 10
 
-    # ---------------------------------------------------------
-    # 2. Necessity Score (20% Weight)
-    # ---------------------------------------------------------
-    # Logic: High Congestion = Premium Pricing Power.
+    # Necessity (Based on Congestion)
     c = df["Congestion_Index"]
-    scores["Necessity_Score"] = (c - c.min()) / (c.max() - c.min()) * 10
+    necessity = (c - c.min()) / (c.max() - c.min()) * 10
 
-    # ---------------------------------------------------------
-    # 3. Efficiency Score (50% Weight - CRITICAL)
-    # ---------------------------------------------------------
-    # Logic: The core of cost-saving. Replacing a long, winding truck route
-    # with a short drone flight generates the highest profit margin.
-
-    # Calculate Tortuosity (Driving / Linear)
+    # Efficiency (Based on Tortuosity & Range)
     tortuosity = df["Driving_Distance"] / (df["Linear_Distance"] + 0.01)
-
-    # Apply Range Penalty (If > 5km, score drops significantly)
     range_penalty = np.where(df["Linear_Distance"] > 5.0, 0.2, 1.0)
+    raw_eff = tortuosity * range_penalty
+    efficiency = (raw_eff - raw_eff.min()) / (raw_eff.max() - raw_eff.min()) * 10
 
-    # Calculate and Normalize
-    raw_efficiency = tortuosity * range_penalty
-    scores["Efficiency_Score"] = (
-        (raw_efficiency - raw_efficiency.min())
-        / (raw_efficiency.max() - raw_efficiency.min())
-        * 10
-    )
+    # -----------------------------------------------------
+    # 2. Define Scenarios (The "Menu" for Leaders)
+    # -----------------------------------------------------
+    # Format: [Efficiency_Weight, Demand_Weight, Necessity_Weight]
 
-    # ---------------------------------------------------------
-    # 4. Total Weighted Score
-    # ---------------------------------------------------------
-    # Formula: Efficiency(0.5) + Demand(0.3) + Necessity(0.2)
-    # This reflects a business model focused on Cost Efficiency and Profitability.
-    scores["Total_Score"] = (
-        scores["Efficiency_Score"] * 0.5
-        + scores["Demand_Score"] * 0.3
-        + scores["Necessity_Score"] * 0.2
-    )
+    scenarios = {
+        "1. Cost Focus\n(Efficiency 60%)": [
+            0.6,
+            0.2,
+            0.2,
+        ],
+        "2. Market Scale\n(Demand 60%)": [0.2, 0.6, 0.2],
+        "3. Pain Point\n(Necessity 60%)": [0.2, 0.2, 0.6],
+        "4. Balanced\n(Equal Weights)": [0.33, 0.33, 0.33],
+    }
 
-    return scores
+    # -----------------------------------------------------
+    # 3. Calculate Scores for Each Scenario
+    # -----------------------------------------------------
+    results = df[["Area"]].copy()
+
+    for name, weights in scenarios.items():
+        w_eff, w_dem, w_nec = weights
+        # Calculate weighted sum
+        score = (efficiency * w_eff) + (demand * w_dem) + (necessity * w_nec)
+        results[name] = score
+
+    return results
+
+
+# Execute Calculation
+scenario_scores = calculate_scenarios(raw_data)
+
+# Print Table for verification
+print("\n--- Multi-Scenario Analysis Results ---")
+print(scenario_scores.round(2))
 
 
 # ==========================================
-# EXECUTION
-# ==========================================
-
-# Calculate final scores with Weighted Logic
-final_scores = calculate_scores(raw_data)
-
-# Print the results
-print("\n--- Phase 2: Calculated Scores (Weighted: Eff 50%, Dem 30%, Nec 20%) ---")
-print(final_scores.round(2))
-
-# ==========================================
-# PHASE 3: VISUALIZATION (STACKED BAR CHART)
+# PHASE 3: VISUALIZATION (DECISION HEATMAP)
 # ==========================================
 
 
-def plot_stacked_bar(scores_df):
-    # 1. Prepare Data: Calculate Weighted Contributions
-    # -------------------------------------------------
-    # We want to show HOW the total score is built.
-    # So we don't plot the raw 0-10 score, we plot the "Weighted Points".
+def plot_decision_heatmap(scores_df):
+    # Prepare data for Heatmap
+    # Set 'Area' as index so rows are areas
+    heatmap_data = scores_df.set_index("Area")
 
-    areas = scores_df["Area"]
-
-    # Calculate the height of each segment based on weights
-    # Efficiency (50%), Demand (30%), Necessity (20%)
-    eff_contrib = scores_df["Efficiency_Score"] * 0.5
-    dem_contrib = scores_df["Demand_Score"] * 0.3
-    nec_contrib = scores_df["Necessity_Score"] * 0.2
-
-    # 2. Setup Plot
-    # -------------
+    # Setup Plot
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Bar width
-    width = 0.5
-    x = np.arange(len(areas))
+    # Create Heatmap manually (using imshow) to avoid needing extra libraries like seaborn
+    # Transpose data so: X-axis = Scenarios, Y-axis = Areas (Easier to read)
+    data_values = heatmap_data.values
 
-    # 3. Plot Stacked Bars
-    # --------------------
-    # Bottom layer: Efficiency (The most important foundation)
-    p1 = ax.bar(
-        x, eff_contrib, width, label="Cost Efficiency (50%)", color="#1f77b4", alpha=0.9
-    )
+    # Plot the heatmap
+    im = ax.imshow(
+        data_values, cmap="YlGnBu", aspect="auto"
+    )  # Yellow-Green-Blue colormap
 
-    # Middle layer: Demand (Stacked on top of Efficiency)
-    p2 = ax.bar(
-        x,
-        dem_contrib,
-        width,
-        bottom=eff_contrib,
-        label="Commercial Demand (30%)",
-        color="#ff7f0e",
-        alpha=0.9,
-    )
+    # Add Colorbar
+    cbar = ax.figure.colorbar(im, ax=ax)
+    cbar.ax.set_ylabel("Total Score (0-10)", rotation=-90, va="bottom")
 
-    # Top layer: Necessity (Stacked on top of previous two)
-    p3 = ax.bar(
-        x,
-        nec_contrib,
-        width,
-        bottom=eff_contrib + dem_contrib,
-        label="Pain Point Necessity (20%)",
-        color="#d62728",
-        alpha=0.9,
-    )
+    # Set Ticks and Labels
+    # X-axis: Scenarios
+    ax.set_xticks(np.arange(data_values.shape[1]))
+    ax.set_xticklabels(heatmap_data.columns, fontsize=10, fontweight="bold")
 
-    # 4. Add Labels & Formatting
-    # --------------------------
-    ax.set_ylabel("Total Weighted Score (0-10)", fontsize=12, fontweight="bold")
+    # Y-axis: Areas
+    ax.set_yticks(np.arange(data_values.shape[0]))
+    ax.set_yticklabels(heatmap_data.index, fontsize=12, fontweight="bold")
+
+    # Add Score Text inside each cell
+    for i in range(data_values.shape[0]):  # Rows (Areas)
+        for j in range(data_values.shape[1]):  # Cols (Scenarios)
+            score = data_values[i, j]
+            # Choose text color based on background darkness
+            text_color = "white" if score > 5 else "black"
+            text = ax.text(
+                j,
+                i,
+                f"{score:.1f}",
+                ha="center",
+                va="center",
+                color=text_color,
+                fontweight="bold",
+                fontsize=12,
+            )
+
+    # Final Formatting
     ax.set_title(
-        "Site Selection Ranking: Profitability Focus",
-        fontsize=14,
+        "Strategic Decision Matrix: Where should we launch?",
+        fontsize=15,
         fontweight="bold",
         pad=20,
     )
-    ax.set_xticks(x)
-    ax.set_xticklabels(areas, fontsize=11, rotation=0)
-    ax.set_ylim(0, 11)  # Leave some space for text on top
-
-    # Add Legend
-    ax.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Evaluation Criteria")
-
-    # 5. Add Value Labels (The Total Score) on top of bars
-    # ----------------------------------------------------
-    total_scores = scores_df["Total_Score"]
-    for i, v in enumerate(total_scores):
-        ax.text(
-            i,
-            v + 0.2,
-            str(round(v, 2)),
-            ha="center",
-            va="bottom",
-            fontsize=12,
-            fontweight="bold",
-        )
-
-    # Add grid for easier reading
-    ax.grid(axis="y", linestyle="--", alpha=0.5)
-
-    # Adjust layout to fit legend
     plt.tight_layout()
     plt.show()
 
 
-# ==========================================
-# EXECUTION
-# ==========================================
-
-print("\n--- Phase 3: Generating Stacked Bar Chart... ---")
-plot_stacked_bar(final_scores)
+# Generate Plot
+print("\n--- Generating Decision Heatmap... ---")
+plot_decision_heatmap(scenario_scores)
