@@ -197,7 +197,7 @@ def plot_simulation_results(df):
     # 3. Add Numerical Labels on Top of Bars
     for container in chart.containers:
         chart.bar_label(
-            container, fmt="%.0f", padding=3, fontsize=11, fontweight="bold"
+            container, fmt="%.0f", padding=3, fontsize=11, fontweight="bold"  # type: ignore
         )
 
     # 4. Chart Formatting
