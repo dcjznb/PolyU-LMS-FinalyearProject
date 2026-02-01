@@ -4,28 +4,29 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # ==========================================
-# PHASE 1: DATA CONFIGURATION
+# PHASE 1: DATA CONFIGURATION (FINAL "SPEED PK" VERSION)
 # ==========================================
 
-# 1. Define Operational Parameters (Uncertainty Ranges)
-# -----------------------------------------------------
+# 1. Define Operational Parameters
+# --------------------------------
 
-# --- MODEL A: TRADITIONAL TRUCK ---
-# Time estimates for manual operations (in Minutes)
+# --- MODEL A: TRADITIONAL TRUCK (SINGLE UNIT) ---
+# Scenario: "Direct Dispatch" - Driver picks up 1 parcel and drives immediately.
+# No waiting for full load.
 TRUCK_OPS = {
-    "loading": (15, 25),  # Loading at origin
-    "unloading": (15, 25),  # Unloading at warehouse
-    "last_mile": (10, 20),  # Final delivery to Tai Po Centre
+    "loading": (3, 8),  # Very fast: Park -> Pick -> Go
+    "unloading": (3, 8),  # Very fast: Park -> Drop
+    "last_mile": (10, 20),  # Drive to final address + walk up
 }
 
-# --- MODEL B: MTR + DRONE ---
-# Time estimates for multi-modal steps (in Minutes)
+# --- MODEL B: MTR + DRONE (SINGLE UNIT) ---
+# Inherently single-unit operation.
 MTR_OPS = {
-    "first_mile": (5, 15),  # Walking/Van to origin station
-    "wait_time": (0, 6),  # Waiting for the train (Headway)
-    "transfer": (8, 12),  # Station to Drone Pad transfer
-    "drone_load": (3, 5),  # Loading cargo into drone
-    "flight": (3, 5),  # Flight to Tai Po Centre (1.8km)
+    "first_mile": (5, 15),  # Walk/Van to station
+    "wait_time": (0, 6),  # MTR Headway
+    "transfer": (8, 12),  # Station internal transfer
+    "drone_load": (3, 5),  # Mount parcel to drone
+    "flight": (3, 5),  # Aerial transit
 }
 
 # 2. Define Station Transit Data
@@ -47,9 +48,9 @@ STATIONS_DB = {
 }
 
 # Verification Print
-print("--- Phase 1: Data Loaded Successfully ---")
+print("--- Phase 1: Data Loaded Successfully (REVISED) ---")
+print("NOTE: Truck loading/unloading times reduced to 5-10 mins for fair comparison.")
 print(f"Total Stations Loaded: {len(STATIONS_DB)}")
-print("Ready for Simulation Engine.")
 
 # ==========================================
 # PHASE 2: MONTE CARLO SIMULATION ENGINE
