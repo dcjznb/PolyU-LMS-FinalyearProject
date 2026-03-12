@@ -1,0 +1,46 @@
+======================================================================
+MONTE CARLO SIMULATION | Drone Fleet Size: 4 | Runs: 100
+======================================================================
+Coordinates loaded: 15 delivery points
+Running 100 simulations...
+Completed.
+
+======================================================================
+KEY TIMING STATISTICS (Drone Fleet Size: 4)
+======================================================================
+
+[1] Total Completion Time (minutes)
+----------------------------------------------------------------------
+  Mean:                         46.9
+  Median:                       45.8
+  Std Dev:                       5.9
+  Min:                          36.2
+  Max:                          63.5
+  P95:                          58.3
+
+[2] Derived Metrics
+----------------------------------------------------------------------
+  P95 Completion Time:          58.3 minutes
+  Coefficient of Variation:     12.5%
+  Flight Time Ratio:            66.2%
+  Battery Swap Time (mean):     54.8 minutes (116.7%)
+  Avg Batch Completion Interval:   4.3 minutes/batch
+
+======================================================================
+GENERATING CHARTS
+======================================================================
+Generating Chart A: Completion Time Distribution...
+  Saved: A_completion_time_distribution.png
+Generating Chart B: CDF of Completion Time...
+  Saved: B_completion_time_cdf.png
+Generating Chart C: Time Breakdown...
+  Saved: C_time_breakdown_stacked.png
+Generating Chart D: Gantt Chart...
+  Saved: D_delivery_timeline_gantt.png
+
+All charts saved to: c:\users\morgan ma\downloads\charts
+
+[EXPORT] Results saved to: monte_carlo_results.json
+======================================================================
+ANALYSIS COMPLETED
+======================================================================
