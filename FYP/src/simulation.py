@@ -2,224 +2,203 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import math
 
 # ==========================================
-# PHASE 1: DATA CONFIGURATION (FINAL "SPEED PK" VERSION)
+# 1. Real-world Geographical Coordinates and Physical Distance Calculation
 # ==========================================
+BASE_STATION = (22.4439, 114.1644)  # Tai Po Market MTR Station
 
-# 1. Define Operational Parameters
-# --------------------------------
+DELIVERY_NODES = [
+    (22.4300, 114.1850),  # Tai Po Kau San Wai
+    (22.4285, 114.1682),  # 192 Ban Shan Chau
+    (22.4402, 114.1568),  # Ma Wo
+    (22.4610, 114.1735),  # Ha Hang
+    (22.4583, 114.1820),  # Tai Po Industrial Estate
+    (22.4580, 114.1710),  # Fu Heng Estate
+    (22.4465, 114.1725),  # Kwong Fuk Estate
+    (22.4530, 114.1680),  # Tai Po Centre
+]
 
-# --- MODEL A: TRADITIONAL TRUCK (SINGLE UNIT) ---
-# Scenario: "Direct Dispatch" - Driver picks up 1 parcel and drives immediately.
-# No waiting for full load.
-TRUCK_OPS = {
-    "loading": (3, 8),  # Very fast: Park -> Pick -> Go
-    "unloading": (3, 8),  # Very fast: Park -> Drop
-    "last_mile": (10, 20),  # Drive to final address + walk up
-}
 
-# --- MODEL B: MTR + DRONE (SINGLE UNIT) ---
-# Inherently single-unit operation.
-MTR_OPS = {
-    "first_mile": (5, 15),  # Walk/Van to station
-    "wait_time": (0, 6),  # MTR Headway
-    "transfer": (8, 12),  # Station internal transfer
-    "drone_load": (3, 5),  # Mount parcel to drone
-    "flight": (3, 5),  # Aerial transit
-}
+def calculate_haversine(coord1, coord2):
+    """
+    Calculate the great-circle distance between two points on the Earth surface.
+    """
+    R = 6371.0  # Earth's radius in kilometers
+    lat1, lon1 = math.radians(coord1[0]), math.radians(coord1[1])
+    lat2, lon2 = math.radians(coord2[0]), math.radians(coord2[1])
+    dlat, dlon = lat2 - lat1, lon2 - lon1
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
+    return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
 
-# 2. Define Station Transit Data
-# ------------------------------
-# Origins: East Rail Line stations south of Tai Po Market.
-# MTR Time: Fixed (Authoritative source).
-# Truck Time: Range (Min, Max) based on Google Maps traffic data.
 
+# Pre-calculate the real-world distance array for the 8 delivery nodes
+DISTANCES_KM = np.array(
+    [calculate_haversine(BASE_STATION, node) for node in DELIVERY_NODES]
+)
+
+
+# ==========================================
+# 2. Define Statistical Tools (Mean and Variance Calculation)
+# ==========================================
+def uniform_stats(min_val, max_val):
+    """Calculate the Expected Value (Mean) and Variance of a Uniform Distribution U(a,b)"""
+    mean = (min_val + max_val) / 2.0
+    variance = ((max_val - min_val) ** 2) / 12.0
+    return mean, variance
+
+
+def normal_stats(mean, std_dev):
+    """Return the Expected Value (Mean) and Variance of a Normal Distribution"""
+    return mean, std_dev**2
+
+
+# ==========================================
+# 3. Core Analytical Engine
+# ==========================================
 STATIONS_DB = {
-    "Admiralty": {"mtr_time": 29, "truck_range": (35, 75)},
-    "Exhibition Ctr": {"mtr_time": 27, "truck_range": (35, 70)},
-    "Hung Hom": {"mtr_time": 22, "truck_range": (25, 55)},
-    "Mong Kok East": {"mtr_time": 18, "truck_range": (20, 45)},
-    "Kowloon Tong": {"mtr_time": 15, "truck_range": (20, 45)},
-    "Tai Wai": {"mtr_time": 11, "truck_range": (15, 30)},
-    "Sha Tin": {"mtr_time": 8, "truck_range": (12, 25)},
-    "Fo Tan": {"mtr_time": 5, "truck_range": (10, 20)},
-    "University": {"mtr_time": 3, "truck_range": (8, 15)},
+    "Admiralty": {"mtr": 29, "truck": (35, 75)},
+    "Exhibition Ctr": {"mtr": 27, "truck": (35, 70)},
+    "Hung Hom": {"mtr": 22, "truck": (25, 55)},
+    "Mong Kok East": {"mtr": 18, "truck": (20, 45)},
+    "Kowloon Tong": {"mtr": 15, "truck": (20, 45)},
+    "Tai Wai": {"mtr": 11, "truck": (15, 30)},
+    "Sha Tin": {"mtr": 8, "truck": (12, 25)},
+    "Fo Tan": {"mtr": 5, "truck": (10, 20)},
+    "University": {"mtr": 3, "truck": (8, 15)},
 }
 
-# Verification Print
-print("--- Phase 1: Data Loaded Successfully (REVISED) ---")
-print("NOTE: Truck loading/unloading times reduced to 5-10 mins for fair comparison.")
-print(f"Total Stations Loaded: {len(STATIONS_DB)}")
-
-# ==========================================
-# PHASE 2: MONTE CARLO SIMULATION ENGINE
-# ==========================================
-
-# Settings
-N_SIMULATIONS = 10000  # Run 10,000 scenarios for each station
-np.random.seed(42)  # Fix random seed for reproducibility
-
-# List to store simulation results
 results_data = []
 
-print(f"--- Starting Simulation Engine ({N_SIMULATIONS} runs per station) ---")
+# --- Pre-calculate Last-Mile Mean and Variance (Assuming equal probability for all 8 nodes) ---
+
+# Truck Last-Mile: Distance * 1.5 (tortuosity) / 0.5 km/min (30km/h) + U(5,10) Parking/Delivery penalty
+truck_drive_times = (DISTANCES_KM * 1.5) / 0.5
+truck_drive_mean = np.mean(truck_drive_times)
+truck_drive_var = np.var(
+    truck_drive_times
+)  # Variance of the discrete spatial distribution
+park_mean, park_var = uniform_stats(5, 10)
+truck_lastmile_mean = truck_drive_mean + park_mean
+truck_lastmile_var = truck_drive_var + park_var
+
+# Drone Last-Mile: Distance / 0.9 km/min (54km/h) + 1 minute drop-off time
+drone_flight_times = (DISTANCES_KM / 0.9) + 1.0
+drone_flight_mean = np.mean(drone_flight_times)
+drone_flight_var = np.var(drone_flight_times)
+
+# -----------------------------------------------------------
 
 for station, data in STATIONS_DB.items():
 
-    # -------------------------------------------------------
-    # MODEL A: TRADITIONAL TRUCK (Using Uniform Distribution)
-    # -------------------------------------------------------
-    # Logic: We treat every step as a range with equal probability.
+    # === MODEL A: Traditional Truck Analytical Calculation ===
+    m_load, v_load = uniform_stats(5, 10)
+    m_road, v_road = uniform_stats(data["truck"][0], data["truck"][1])
+    m_unload, v_unload = uniform_stats(5, 10)
 
-    # 1. Operational Steps (Loading, Unloading, Last Mile)
-    t_load = np.random.uniform(
-        TRUCK_OPS["loading"][0], TRUCK_OPS["loading"][1], N_SIMULATIONS
-    )
-    t_unload = np.random.uniform(
-        TRUCK_OPS["unloading"][0], TRUCK_OPS["unloading"][1], N_SIMULATIONS
-    )
-    t_last = np.random.uniform(
-        TRUCK_OPS["last_mile"][0], TRUCK_OPS["last_mile"][1], N_SIMULATIONS
-    )
+    truck_total_mean = m_load + m_road + m_unload + truck_lastmile_mean
+    truck_total_var = v_load + v_road + v_unload + truck_lastmile_var
+    truck_total_std = math.sqrt(truck_total_var)
+    truck_p95 = truck_total_mean + (
+        1.645 * truck_total_std
+    )  # Normal approximation based on Central Limit Theorem (CLT)
 
-    # 2. Road Transit (The biggest uncertainty)
-    # Uses the specific range for this station (e.g., 35-75 min for Admiralty)
-    t_road = np.random.uniform(
-        data["truck_range"][0], data["truck_range"][1], N_SIMULATIONS
-    )
-
-    # 3. Total Time Calculation (Vectorized Sum)
-    total_time_truck = t_load + t_road + t_unload + t_last
-
-    # -------------------------------------------------------
-    # MODEL B: MTR + DRONE (Using Mixed Distributions)
-    # -------------------------------------------------------
-    # Logic: Operational steps are ranges (Uniform), but Rail Transit is fixed (Normal).
-
-    # 1. Operational Steps (First Mile, Transfer, Drone Ops)
-    t_first = np.random.uniform(
-        MTR_OPS["first_mile"][0], MTR_OPS["first_mile"][1], N_SIMULATIONS
-    )
-    t_wait = np.random.uniform(
-        MTR_OPS["wait_time"][0], MTR_OPS["wait_time"][1], N_SIMULATIONS
-    )
-    t_transfer = np.random.uniform(
-        MTR_OPS["transfer"][0], MTR_OPS["transfer"][1], N_SIMULATIONS
-    )
-    t_drone_load = np.random.uniform(
-        MTR_OPS["drone_load"][0], MTR_OPS["drone_load"][1], N_SIMULATIONS
-    )
-    t_flight = np.random.uniform(
-        MTR_OPS["flight"][0], MTR_OPS["flight"][1], N_SIMULATIONS
-    )
-
-    # 2. MTR Rail Transit (The stable backbone)
-    # Uses Normal Distribution centered at the official time with small variance (0.5 min)
-    t_rail = np.random.normal(loc=data["mtr_time"], scale=0.5, size=N_SIMULATIONS)
-
-    # 3. Total Time Calculation
-    total_time_mtr = t_first + t_wait + t_rail + t_transfer + t_drone_load + t_flight
-
-    # -------------------------------------------------------
-    # DATA RECORDING
-    # -------------------------------------------------------
-    # We define "Worst Case" as the 95th percentile (P95) - important for logistics
-
-    # Record Truck Stats
     results_data.append(
         {
             "Station": station,
             "Mode": "Traditional Truck",
-            "Average_Time": np.mean(total_time_truck),
-            "P95_Time": np.percentile(
-                total_time_truck, 95
-            ),  # 95% chance to arrive within this time
-            "Std_Dev": np.std(total_time_truck),  # Stability metric
+            "Average_Time": truck_total_mean,
+            "P95_Time": truck_p95,
+            "Std_Dev": truck_total_std,
         }
     )
 
-    # Record MTR Stats
+    # === MODEL B: MTR + Drone Analytical Calculation ===
+    m_first, v_first = uniform_stats(5, 10)
+    m_wait, v_wait = uniform_stats(0, 6)
+    m_rail, v_rail = normal_stats(
+        data["mtr"], 0.5
+    )  # MTR standard deviation set to a highly stable 0.5 minutes
+    m_transfer, v_transfer = uniform_stats(3, 5)
+    m_drone_load, v_drone_load = uniform_stats(2, 4)
+
+    mtr_total_mean = (
+        m_first + m_wait + m_rail + m_transfer + m_drone_load + drone_flight_mean
+    )
+    mtr_total_var = (
+        v_first + v_wait + v_rail + v_transfer + v_drone_load + drone_flight_var
+    )
+    mtr_total_std = math.sqrt(mtr_total_var)
+    mtr_p95 = mtr_total_mean + (1.645 * mtr_total_std)
+
     results_data.append(
         {
             "Station": station,
             "Mode": "MTR + Drone",
-            "Average_Time": np.mean(total_time_mtr),
-            "P95_Time": np.percentile(total_time_mtr, 95),
-            "Std_Dev": np.std(total_time_mtr),
+            "Average_Time": mtr_total_mean,
+            "P95_Time": mtr_p95,
+            "Std_Dev": mtr_total_std,
         }
     )
 
-# Convert list to DataFrame for analysis
 df_results = pd.DataFrame(results_data)
 
-print("--- Simulation Complete ---")
-print("Sample of calculated data (First 5 rows):")
-print(df_results.head())
+# ==========================================
+# 4. Visualization and Chart Generation
+# ==========================================
+sns.set_theme(style="whitegrid")
+plt.figure(figsize=(12, 7))
 
+chart = sns.barplot(
+    data=df_results,
+    x="Station",
+    y="Average_Time",
+    hue="Mode",
+    palette=["#d62728", "#1f77b4"],
+    alpha=0.9,
+    edgecolor="black",
+)
 
-comparison_table = df_results.pivot(
-    index="Station", columns="Mode", values="Average_Time"
+for container in chart.containers:
+    chart.bar_label(container, fmt="%.1f", padding=3, fontsize=11, fontweight="bold")
+
+plt.title(
+    "Analytical Calculation: Traditional Truck vs. MTR + Drone\n(Impact of Origin Distance on Expected Delivery Time)",
+    fontsize=15,
+    fontweight="bold",
+    pad=20,
 )
-comparison_table["Time Saved (min)"] = (
-    comparison_table["Traditional Truck"] - comparison_table["MTR + Drone"]
+plt.ylabel("Expected Total Time (Minutes)", fontsize=13, fontweight="bold")
+plt.xlabel("Origin Station (East Rail Line)", fontsize=13, fontweight="bold")
+plt.xticks(fontsize=11)
+plt.ylim(0, 140)
+plt.legend(title="Transport Mode", loc="upper right", frameon=True)
+plt.tight_layout()
+plt.show()
+
+# Print precise comparison data
+comparison = df_results.pivot(index="Station", columns="Mode", values="Average_Time")
+comparison["Time Saved (min)"] = (
+    comparison["Traditional Truck"] - comparison["MTR + Drone"]
 )
-comparison_table["Improvement (%)"] = (
-    comparison_table["Time Saved (min)"] / comparison_table["Traditional Truck"]
-) * 100
-print("\n--- (Side-by-Side Comparison) ---")
+comparison["Std_Dev_Truck"] = df_results[
+    df_results["Mode"] == "Traditional Truck"
+].set_index("Station")["Std_Dev"]
+comparison["Std_Dev_MTR"] = df_results[df_results["Mode"] == "MTR + Drone"].set_index(
+    "Station"
+)["Std_Dev"]
 print(
-    comparison_table[
-        ["Traditional Truck", "MTR + Drone", "Time Saved (min)", "Improvement (%)"]
+    comparison[
+        [
+            "Traditional Truck",
+            "MTR + Drone",
+            "Time Saved (min)",
+            "Std_Dev_Truck",
+            "Std_Dev_MTR",
+        ]
     ].round(1)
 )
-
-# ==========================================
-# PHASE 3: VISUALIZATION (CLEAN VERSION)
-# ==========================================
-
-
-def plot_simulation_results(df):
-    # 1. Setup the plot style and size
-    sns.set_theme(style="whitegrid")
-    plt.figure(figsize=(12, 7))
-
-    # 2. Create a Grouped Bar Chart
-    chart = sns.barplot(
-        data=df,
-        x="Station",
-        y="Average_Time",
-        hue="Mode",
-        palette=["#d62728", "#1f77b4"],  # Red for Truck, Blue for MTR
-        alpha=0.9,
-        edgecolor="black",
-    )
-
-    # 3. Add Numerical Labels on Top of Bars
-    for container in chart.containers:
-        chart.bar_label(
-            container, fmt="%.0f", padding=3, fontsize=11, fontweight="bold"  # type: ignore
-        )
-
-    # 4. Chart Formatting
-    plt.title(
-        "Simulation Result: Traditional Truck vs. MTR + Drone\n(Impact of Origin Distance on Delivery Time)",
-        fontsize=15,
-        fontweight="bold",
-        pad=20,
-    )
-    plt.ylabel("Average Total Time (Minutes)", fontsize=13, fontweight="bold")
-    plt.xlabel("Origin Station (East Rail Line)", fontsize=13, fontweight="bold")
-    plt.xticks(fontsize=11)
-    plt.yticks(fontsize=11)
-    plt.ylim(0, 140)
-    plt.legend(title="Transport Mode", loc="upper right", frameon=True)
-
-    # 5. Show the Plot
-    plt.tight_layout()
-    plt.show()
-
-
-# Execute the visualization
-print("--- Generating Final Comparison Chart (Clean)... ---")
-plot_simulation_results(df_results)
