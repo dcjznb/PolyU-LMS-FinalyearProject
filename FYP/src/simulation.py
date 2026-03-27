@@ -7,17 +7,29 @@ import math
 # ==========================================
 # 1. Real-world Geographical Coordinates and Physical Distance Calculation
 # ==========================================
-BASE_STATION = (22.4439, 114.1644)  # Tai Po Market MTR Station
+# Updated to the most precise coordinates for the Tai Po Market base station
+BASE_STATION = (22.444510, 114.170447)
 
+# The complete 15 real-world delivery node coordinates
 DELIVERY_NODES = [
-    (22.4300, 114.1850),  # Tai Po Kau San Wai
-    (22.4285, 114.1682),  # 192 Ban Shan Chau
-    (22.4402, 114.1568),  # Ma Wo
-    (22.4610, 114.1735),  # Ha Hang
-    (22.4583, 114.1820),  # Tai Po Industrial Estate
-    (22.4580, 114.1710),  # Fu Heng Estate
-    (22.4465, 114.1725),  # Kwong Fuk Estate
-    (22.4530, 114.1680),  # Tai Po Centre
+    (22.434244, 114.188128),  # Dest 1: Ti Tao Tsuen House 15
+    (22.436428, 114.182034),  # Dest 2: Savanna Garden Block 42
+    (22.439245, 114.182323),  # Dest 3: 4138 Tai Po Road - Tai Po Kau
+    (22.442473, 114.176151),  # Dest 4: Wong Yi Au Village Public Toilet
+    (22.434132, 114.167191),  # Dest 5: 88 Organic Farm
+    (22.438541, 114.165251),  # Dest 6: Wah's Store Cainiao Pick-up Point
+    (22.441623, 114.160753),  # Dest 7: SF Smart Locker (Grand Dynasty View)
+    (22.444682, 114.166511),  # Dest 8: Tai Po Pan Chung San Tsuen Pick-up Point P37
+    (22.447275, 114.166360),  # Dest 9: Po Heung Estate Po Shun House Pick-up Point
+    (22.451656, 114.161194),  # Dest 10: Cainiao Pick-up Point P34 Tai Wo Market
+    (22.448902, 114.169665),  # Dest 11: P23
+    (
+        22.449547,
+        114.176982,
+    ),  # Dest 12: Tai Po Kwong Fuk Market Cainiao Pick-up Point P28
+    (22.454516, 114.176513),  # Dest 13: SF Express Tai Po Fu Shin Shopping Centre
+    (22.455899, 114.169003),  # Dest 14: Tai Yuen Commercial Centre LK01 SF Smart Locker
+    (22.456571, 114.188370),  # Dest 15: Dai Kwai Street, Industrial Estate
 ]
 
 
@@ -36,10 +48,38 @@ def calculate_haversine(coord1, coord2):
     return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
 
 
-# Pre-calculate the real-world distance array for the 8 delivery nodes
+# Pre-calculate the real-world distance array for the 15 delivery nodes
 DISTANCES_KM = np.array(
     [calculate_haversine(BASE_STATION, node) for node in DELIVERY_NODES]
 )
+
+# Match 3.20code.py parcel destination logic:
+# 30%-40% parcels go to special points (10, 11, 14), remaining parcels are
+# uniformly distributed among the other 12 destinations.
+SPECIAL_POINTS = [10, 11, 14]
+SPECIAL_RATIO_RANGE = (0.30, 0.40)
+
+
+def build_destination_probabilities():
+    """Build destination probabilities aligned with the 3.20code destination weighting logic.
+
+    Special points (10, 11, 14) jointly receive 30%-40% demand (modeled by
+    the midpoint 35%), while the remaining demand is evenly distributed across
+    the other 12 destinations.
+    """
+    n_dest = len(DELIVERY_NODES)
+    probs = np.zeros(n_dest, dtype=float)
+
+    special_ratio = np.mean(SPECIAL_RATIO_RANGE)
+    regular_points = [i for i in range(1, n_dest + 1) if i not in SPECIAL_POINTS]
+
+    # Split special share equally among special points, regular share equally among regular points.
+    for p in SPECIAL_POINTS:
+        probs[p - 1] = special_ratio / len(SPECIAL_POINTS)
+    for p in regular_points:
+        probs[p - 1] = (1.0 - special_ratio) / len(regular_points)
+
+    return probs
 
 
 # ==========================================
@@ -74,22 +114,26 @@ STATIONS_DB = {
 
 results_data = []
 
-# --- Pre-calculate Last-Mile Mean and Variance (Assuming equal probability for all 8 nodes) ---
+# --- Pre-calculate Last-Mile Mean and Variance (non-uniform destination probabilities) ---
+
+DESTINATION_PROBS = build_destination_probabilities()
 
 # Truck Last-Mile: Distance * 1.5 (tortuosity) / 0.5 km/min (30km/h) + U(5,10) Parking/Delivery penalty
 truck_drive_times = (DISTANCES_KM * 1.5) / 0.5
-truck_drive_mean = np.mean(truck_drive_times)
-truck_drive_var = np.var(
-    truck_drive_times
-)  # Variance of the discrete spatial distribution
+truck_drive_mean = np.sum(truck_drive_times * DESTINATION_PROBS)
+truck_drive_var = np.sum(
+    DESTINATION_PROBS * (truck_drive_times - truck_drive_mean) ** 2
+)  # Variance of weighted discrete spatial distribution
 park_mean, park_var = uniform_stats(5, 10)
 truck_lastmile_mean = truck_drive_mean + park_mean
 truck_lastmile_var = truck_drive_var + park_var
 
 # Drone Last-Mile: Distance / 0.9 km/min (54km/h) + 1 minute drop-off time
 drone_flight_times = (DISTANCES_KM / 0.9) + 1.0
-drone_flight_mean = np.mean(drone_flight_times)
-drone_flight_var = np.var(drone_flight_times)
+drone_flight_mean = np.sum(drone_flight_times * DESTINATION_PROBS)
+drone_flight_var = np.sum(
+    DESTINATION_PROBS * (drone_flight_times - drone_flight_mean) ** 2
+)
 
 # -----------------------------------------------------------
 
