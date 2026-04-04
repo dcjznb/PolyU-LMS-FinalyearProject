@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import math
+import os
+from matplotlib.container import BarContainer
 
 # ==========================================
 # 1. Real-world Geographical Coordinates and Physical Distance Calculation
@@ -208,7 +210,10 @@ chart = sns.barplot(
 )
 
 for container in chart.containers:
-    chart.bar_label(container, fmt="%.1f", padding=3, fontsize=11, fontweight="bold")
+    if isinstance(container, BarContainer):
+        chart.bar_label(
+            container, fmt="%.1f", padding=3, fontsize=11, fontweight="bold"
+        )
 
 plt.title(
     "Analytical Calculation: Traditional Truck vs. MTR + Drone\n(Impact of Origin Distance on Expected Delivery Time)",
@@ -246,3 +251,114 @@ print(
         ]
     ].round(1)
 )
+
+
+# ==========================================
+# 5. Certainty Premium Proof Chart
+# ==========================================
+station_order = list(STATIONS_DB.keys())
+
+truck_rows = (
+    df_results[df_results["Mode"] == "Traditional Truck"]
+    .set_index("Station")
+    .reindex(station_order)
+)
+mtr_rows = (
+    df_results[df_results["Mode"] == "MTR + Drone"]
+    .set_index("Station")
+    .reindex(station_order)
+)
+
+x = np.arange(len(station_order))
+
+truck_mean = truck_rows["Average_Time"].to_numpy(dtype=float)
+truck_std = truck_rows["Std_Dev"].to_numpy(dtype=float)
+mtr_mean = mtr_rows["Average_Time"].to_numpy(dtype=float)
+mtr_std = mtr_rows["Std_Dev"].to_numpy(dtype=float)
+
+# Under normal approximation, P10/P90 uses z ~= 1.2816.
+z_10_90 = 1.2816
+truck_p10 = truck_mean - z_10_90 * truck_std
+truck_p90 = truck_mean + z_10_90 * truck_std
+mtr_p10 = mtr_mean - z_10_90 * mtr_std
+mtr_p90 = mtr_mean + z_10_90 * mtr_std
+
+truck_band = truck_p90 - truck_p10
+mtr_band = mtr_p90 - mtr_p10
+certainty_reduction = (1 - (np.mean(mtr_band) / np.mean(truck_band))) * 100
+
+fig, ax = plt.subplots(figsize=(13, 7))
+
+ax.fill_between(
+    x,
+    truck_p10,
+    truck_p90,
+    color="#d62728",
+    alpha=0.18,
+    label="Traditional Truck Uncertainty Band (P10-P90)",
+)
+ax.fill_between(
+    x,
+    mtr_p10,
+    mtr_p90,
+    color="#1f77b4",
+    alpha=0.20,
+    label="MTR + Drone Uncertainty Band (P10-P90)",
+)
+
+ax.plot(
+    x,
+    truck_mean,
+    color="#d62728",
+    linewidth=2.8,
+    marker="o",
+    markersize=6,
+    label="Traditional Truck Mean Time",
+)
+ax.plot(
+    x,
+    mtr_mean,
+    color="#1f77b4",
+    linewidth=2.8,
+    marker="o",
+    markersize=6,
+    label="MTR + Drone Mean Time",
+)
+
+ax.set_title(
+    "Certainty Premium Proof: Variability Compression in Delivery Time",
+    fontsize=15,
+    fontweight="bold",
+    pad=16,
+)
+ax.set_xlabel("Origin Station (East Rail Line)", fontsize=12, fontweight="bold")
+ax.set_ylabel("End-to-End Delivery Time (Minutes)", fontsize=12, fontweight="bold")
+ax.set_xticks(x)
+ax.set_xticklabels(station_order, rotation=15, ha="right")
+ax.grid(True, axis="y", linestyle="--", alpha=0.35)
+ax.legend(loc="upper left", fontsize=10, frameon=True)
+
+ax.text(
+    0.99,
+    0.03,
+    (
+        f"Average uncertainty band reduction: {certainty_reduction:.1f}%\n"
+        f"(Traditional Truck: {np.mean(truck_band):.1f} min, "
+        f"MTR + Drone: {np.mean(mtr_band):.1f} min)"
+    ),
+    transform=ax.transAxes,
+    fontsize=10.5,
+    ha="right",
+    va="bottom",
+    bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "alpha": 0.85},
+)
+
+plt.tight_layout()
+
+output_dir = os.path.join(os.path.dirname(__file__), "simulation_data")
+os.makedirs(output_dir, exist_ok=True)
+certainty_chart_path = os.path.join(output_dir, "certainty_premium_proof.png")
+plt.savefig(certainty_chart_path, dpi=300, bbox_inches="tight")
+plt.show()
+
+print(f"\nCertainty premium chart saved to: {certainty_chart_path}")
