@@ -4,24 +4,24 @@ import matplotlib.patheffects as pe
 
 
 # ==========================================
-# 瀑布图绘制函数 (Waterfall Chart Function)
+# Waterfall chart drawing function
 # ==========================================
 def draw_waterfall(ax, categories, values, title, bar_color, total_color):
-    """绘制单张瀑布图"""
-    # 累加计算
+    """Draw a single waterfall chart."""
+    # Compute cumulative offsets
     cumulative = np.cumsum([0] + values[:-1])
     y_span = max(cumulative[-1] + values[-1], 1)
 
-    # 颜色设置 (最后一根总计柱子颜色不同)
+    # Color setup (final total bar uses a different color)
     colors = [bar_color] * len(values)
     colors[-1] = total_color
 
-    # 画柱子 (bottom参数实现瀑布悬浮效果)
+    # Draw bars (using bottom to create the waterfall float effect)
     bars = ax.bar(
         categories, values, bottom=cumulative, color=colors, edgecolor="white"
     )
 
-    # 添加连接线
+    # Add connector lines
     for i in range(1, len(values)):
         ax.plot(
             [i - 1 - 0.4, i + 0.4],
@@ -31,10 +31,10 @@ def draw_waterfall(ax, categories, values, title, bar_color, total_color):
             linewidth=1,
         )
 
-    # 在柱子上添加具体金额数字
+    # Add value labels on bars
     for i, bar in enumerate(bars):
-        yval = cumulative[i] + values[i] / 2  # 默认将文字放在柱子中间
-        if i == len(values) - 1:  # 最后一根总计柱子，文字放顶上
+        yval = cumulative[i] + values[i] / 2  # Place text at bar center by default
+        if i == len(values) - 1:  # For the final total bar, place text above
             yval = cumulative[i] + values[i] + y_span * 0.012
             ax.text(
                 bar.get_x() + bar.get_width() / 2,
@@ -53,7 +53,7 @@ def draw_waterfall(ax, categories, values, title, bar_color, total_color):
                 },
             )
         else:
-            # 小柱子标签改为放在柱子上方，避免数字挤在一起看不清
+            # For short bars, move labels above to avoid visual overlap
             is_small_bar = values[i] < y_span * 0.06
             if is_small_bar:
                 ax.text(
@@ -97,19 +97,24 @@ def draw_waterfall(ax, categories, values, title, bar_color, total_color):
 
 
 # ==========================================
-# 1. 数据准备 (Data Preparation)
+# 1. Data preparation
 # ==========================================
 
-# 传统货车计算过程
+# Traditional truck cost breakdown
 truck_cats = [
     "Labor\n(4 Drivers)",
     "Fuel\n(850L)",
     "Tolls/Parking\n(4 Trucks)",
     "Total\nOpEx",
 ]
-truck_vals = [104216, 24880, 24000, 153096]  # 最后一个必须等于前面的和
+truck_vals = [
+    104216,
+    24880,
+    24000,
+    153096,
+]  # Final value must equal the sum of prior items
 
-# 无人机计算过程
+# Drone cost breakdown
 drone_cats = [
     "Labor\n(1 Operator)",
     "Battery\n(1050 Flights)",
@@ -123,17 +128,17 @@ drone_vals = [
     5692,
     3580,
     46767,
-]  # 为了图表不过于拥挤，把 MTR 和 电费合并为一项展示
+]  # Merge MTR fee and electricity into one item to keep the chart readable
 
 # ==========================================
-# 2. 绘制并排瀑布图 (Side-by-Side Waterfall)
+# 2. Draw side-by-side waterfall charts
 # ==========================================
 
 fig, (ax1, ax2) = plt.subplots(
     1, 2, figsize=(14, 6), sharey=True
-)  # sharey=True 强制两者共用同一高度比例尺，形成视觉碾压
+)  # sharey=True forces the same y-scale for direct visual comparison
 
-# 画左边的货车瀑布图
+# Draw truck waterfall chart (left)
 draw_waterfall(
     ax1,
     truck_cats,
@@ -143,7 +148,7 @@ draw_waterfall(
     total_color="#8b0000",
 )
 
-# 画右边的无人机瀑布图
+# Draw drone waterfall chart (right)
 draw_waterfall(
     ax2,
     drone_cats,
@@ -153,7 +158,7 @@ draw_waterfall(
     total_color="#08519c",
 )
 
-# 底部添加基准说明
+# Add baseline note at the bottom
 plt.figtext(
     0.5,
     0.01,
@@ -164,10 +169,10 @@ plt.figtext(
     bbox={"facecolor": "#ffffcc", "alpha": 0.5, "pad": 5},
 )
 
-plt.tight_layout(rect=(0, 0.05, 1, 1))  # 给底部的文字留出空间
+plt.tight_layout(rect=(0, 0.05, 1, 1))  # Reserve space for bottom note
 plt.savefig(
     "Cost_Calculation_Waterfall.png", dpi=300, transparent=False, facecolor="white"
 )
 plt.show()
 
-print("✅ 成功生成对冲瀑布图：Cost_Calculation_Waterfall.png")
+print("Successfully generated waterfall chart: Cost_Calculation_Waterfall.png")

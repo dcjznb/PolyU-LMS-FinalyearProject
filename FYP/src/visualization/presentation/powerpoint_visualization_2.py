@@ -4,10 +4,10 @@ from matplotlib.patches import Rectangle
 from matplotlib.offsetbox import AnchoredText
 
 # ==========================================
-# 1. 核心参数准备 (Core Data Assumptions)
+# 1. Core parameter setup
 # ==========================================
 
-# 传统货车参数
+# Traditional truck parameters
 truck_params = {
     "Vehicle Cost (CapEx)": "350,000 HKD / Unit",
     "Driver Salary (Labor)": "26,054 HKD / Month\n(Census 2025)",
@@ -16,7 +16,7 @@ truck_params = {
     "Parking & Tolls": "6,000 HKD / Month / Unit",
 }
 
-# 无人机参数
+# Drone parameters
 drone_params = {
     "Drone + Vertiport (CapEx)": "150,000 HKD / Unit\n(DJI FlyCart 30)",
     "Operator Salary (Labor)": "20,800 HKD / Month\n(1 Staff for 4 Drones)",
@@ -26,23 +26,23 @@ drone_params = {
 }
 
 # ==========================================
-# 2. 绘制参数对冲看板 (Parameter Dashboard)
+# 2. Draw parameter comparison dashboard
 # ==========================================
 
 fig, ax = plt.subplots(figsize=(12, 7))
-ax.axis("off")  # 关闭坐标轴
+ax.axis("off")  # Hide axes
 
-# 背景颜色块区分
+# Background color blocks for visual separation
 ax.add_patch(
     Rectangle((0, 0), 0.48, 1, facecolor="#fce4e4", alpha=0.5, transform=ax.transAxes)
-)  # 浅红背景
+)  # Light red background
 ax.add_patch(
     Rectangle(
         (0.52, 0), 0.48, 1, facecolor="#e4f0fc", alpha=0.5, transform=ax.transAxes
     )
-)  # 浅蓝背景
+)  # Light blue background
 
-# 标题栏
+# Header titles
 ax.text(
     0.24,
     0.92,
@@ -66,7 +66,7 @@ ax.text(
     transform=ax.transAxes,
 )
 
-# 绘制参数行
+# Draw parameter rows
 y_start = 0.75
 y_step = 0.14
 keys = list(truck_params.keys())
@@ -74,7 +74,7 @@ keys = list(truck_params.keys())
 for i, key in enumerate(keys):
     y_pos = y_start - i * y_step
 
-    # 画中间的分隔符和类别标签
+    # Draw center separator and category label
     ax.text(
         0.5,
         y_pos,
@@ -87,7 +87,7 @@ for i, key in enumerate(keys):
         transform=ax.transAxes,
     )
 
-    # 货车数据 (左侧)
+    # Truck data (left side)
     ax.text(
         0.24,
         y_pos,
@@ -100,7 +100,7 @@ for i, key in enumerate(keys):
         transform=ax.transAxes,
     )
 
-    # 无人机数据 (右侧)
+    # Drone data (right side)
     drone_key = list(drone_params.keys())[i]
     ax.text(
         0.76,
@@ -114,7 +114,7 @@ for i, key in enumerate(keys):
         transform=ax.transAxes,
     )
 
-# 底部全局基准声明
+# Global baseline note at the bottom
 plt.figtext(
     0.5,
     0.02,
@@ -136,4 +136,4 @@ plt.tight_layout()
 plt.savefig("Cost_Parameters_Dashboard.png", dpi=300, bbox_inches="tight")
 plt.show()
 
-print("✅ 成功生成参数对照大屏：Cost_Parameters_Dashboard.png")
+print("Successfully generated parameter dashboard: Cost_Parameters_Dashboard.png")
